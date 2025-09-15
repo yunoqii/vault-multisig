@@ -1,10 +1,15 @@
 /// SPDX-License-Identifier: MIT
 /// @title: Contract for wallet with multisig withdraw functionality.
-/// @notice: Allows to withdraw funds from the vault only if a certain number of signers approve the transaction.
+/// @notice: Allows to withdraw ERC20 tokens from the vault only if a certain number of signers approve the transaction.
 /// @author: Yunoqii
 pragma solidity ^0.8.30;
 
-contract VaultMultisig {
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract VaultMultisigERC20 {
+    /// @notice The ERC20 token address to be managed by the multisig wallet
+    IERC20 public token;
+
     /// @notice The number of signatures required to execute a transaction
     uint256 public quorum;
 
@@ -71,8 +76,8 @@ contract VaultMultisig {
     /// @param transferId The ID of the transfer
     error QuorumHasNotBeenReached(uint256 transferId);
 
-    /// @notice Checks that the signer is a multisig admin
-    error InvalidMultisigAdmin();
+    /// @notice Checks that the token address is not the zero address
+    error TokenCantBeZeroAddress();
 
     /// @notice Emitted when a transfer is initiated
     event TransferInitiated(uint256 indexed transferId, address indexed to, uint256 amount);
@@ -101,16 +106,19 @@ contract VaultMultisig {
     /// @notice Initializes the multisig contract
     /// @param _signers The array of multisig signers
     /// @param _quorum The number of signatures required to execute a transaction
-    constructor(address[] memory _signers, uint256 _quorum) {
+    /// @param _tokenAddress The address of the ERC20 token to be managed by the multisig wallet
+    constructor(address[] memory _signers, uint256 _quorum, IERC20 _tokenAddress) {
         if (_signers.length == 0) revert SignersArrayCannotBeEmpty();
         if (_quorum > _signers.length) revert QuorumGreaterThanSigners();
         if (_quorum == 0) revert QuorumCannotBeZero();
+        if (address(_tokenAddress) == address(0)) revert TokenCantBeZeroAddress();
 
         for (uint256 i = 0; i < _signers.length; i++) {
             multiSigSigners[_signers[i]] = true;
         }
 
         quorum = _quorum;
+        token = _tokenAddress;
     }
 
     /// @notice Initiates a transfer
@@ -124,7 +132,7 @@ contract VaultMultisig {
         Transfer storage transfer = transfers[transferId];
         transfer.to = _to;
         transfer.amount = _amount;
-        transfer.approvals = 0;
+        transfer.approvals++;
         transfer.executed = false;
         transfer.approved[msg.sender] = true;
 
@@ -149,19 +157,16 @@ contract VaultMultisig {
         if (transfer.approvals < quorum) revert QuorumHasNotBeenReached(_transferId);
         if (transfer.executed) revert TransferIsAlreadyExecuted(_transferId);
 
-        uint256 balance = address(this).balance;
-        if (transfer.amount >= balance) revert InsufficientBalance(balance, transfer.amount);
+        uint256 balance = token.balanceOf(address(this));
+        if (transfer.amount > balance) revert InsufficientBalance(balance, transfer.amount);
 
-        (bool success,) = transfer.to.call{value: transfer.amount}("");
+        bool success = token.transfer(transfer.to, transfer.amount);
         if (!success) revert TransferFailed(_transferId);
 
         transfer.executed = true;
 
         emit TransferExecuted(_transferId);
     }
-
-    /// @notice Default fallback function for receiving ETH
-    receive() external payable {}
 
     /// @notice Gets the details of a transfer
     /// @param _transferId The ID of the transfer
@@ -191,5 +196,11 @@ contract VaultMultisig {
     /// @return The number of transfers
     function getTransferCount() external view returns (uint256) {
         return transfersCount;
+    }
+
+    /// @notice Gets the current multisig signers
+    /// @return The array of current multisig signers
+    function getSigners() external view returns (address[] memory) {
+        return currentMultiSigSigners;
     }
 }
