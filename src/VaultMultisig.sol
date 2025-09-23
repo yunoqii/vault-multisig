@@ -1,7 +1,7 @@
 /// SPDX-License-Identifier: MIT
 /// @title: Contract for wallet with multisig withdraw functionality.
 /// @notice: Allows to withdraw funds from the vault only if a certain number of signers approve the transaction.
-/// @author: Yunoqii
+/// @author: Solidity University
 pragma solidity ^0.8.30;
 
 contract VaultMultisig {
@@ -33,9 +33,6 @@ contract VaultMultisig {
 
     /// @notice The mapping for verification that address is a signer
     mapping(address => bool) private multiSigSigners;
-
-    /// @notice Checks that contract balance is not empty
-    error VaultIsEmpty();
 
     /// @notice Checks that signers array is not empty
     error SignersArrayCannotBeEmpty();
@@ -69,6 +66,9 @@ contract VaultMultisig {
     /// @notice Checks that the transfer failed
     /// @param transferId The ID of the transfer
     error TransferFailed(uint256 transferId);
+
+    /// @notice Cheks that contract balance is positiv
+    error VaultIsEmpty();
 
     /// @notice Checks that quorum was reached for transfer
     /// @param transferId The ID of the transfer
@@ -128,7 +128,7 @@ contract VaultMultisig {
         Transfer storage transfer = transfers[transferId];
         transfer.to = _to;
         transfer.amount = _amount;
-        transfer.approvals += 1;
+        transfer.approvals = transfer.approvals + 1;
         transfer.executed = false;
         transfer.approved[msg.sender] = true;
 
@@ -162,6 +162,35 @@ contract VaultMultisig {
         transfer.executed = true;
 
         emit TransferExecuted(_transferId);
+    }
+
+    /// @notice Updates the list of multisig signers and sets a new quorum
+    /// @dev Only callable by all current signers via consensus (i.e., must call from multisig itself)
+    /// @param newSigners The new array of signer addresses
+    /// @param newQuorum The new required quorum
+    function updateSignersAndQuorum(address[] calldata newSigners, uint256 newQuorum) external onlyMultisigSigner {
+        if (newSigners.length == 0) revert SignersArrayCannotBeEmpty();
+        if (newQuorum == 0) revert QuorumCannotBeZero();
+        if (newQuorum > newSigners.length) revert QuorumGreaterThanSigners();
+
+        // Clear old signers
+        for (uint256 i = 0; i < currentMultiSigSigners.length; i++) {
+            multiSigSigners[currentMultiSigSigners[i]] = false;
+        }
+
+        delete currentMultiSigSigners;
+
+        // Set new signers
+        for (uint256 i = 0; i < newSigners.length; i++) {
+            address signer = newSigners[i];
+            require(signer != address(0), "Zero address in signers");
+            multiSigSigners[signer] = true;
+            currentMultiSigSigners.push(signer);
+        }
+
+        quorum = newQuorum;
+        emit MultiSigSignersUpdated();
+        emit QuorumUpdated(newQuorum);
     }
 
     /// @notice Default fallback function for receiving ETH
