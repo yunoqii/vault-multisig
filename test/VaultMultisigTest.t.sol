@@ -11,6 +11,11 @@ contract VaultMultisigTest is Test {
     uint256 quorum = 2;
     address[] signers;
     address[] signersArray;
+    address[] newSignersArray;
+
+    address newSigner = vm.addr(5);
+    address newSigner2 = vm.addr(6);
+    address newSigner3 = vm.addr(7);
 
     address signer1 = vm.addr(1);
     address signer2 = vm.addr(2);
@@ -22,6 +27,10 @@ contract VaultMultisigTest is Test {
         signers.push(signer1);
         signers.push(signer2);
         signers.push(signer3);
+
+        newSignersArray.push(newSigner);
+        newSignersArray.push(newSigner2);
+        newSignersArray.push(newSigner3);
 
         vault = new VaultMultisig(signers, quorum);
     }
@@ -180,6 +189,29 @@ contract VaultMultisigTest is Test {
 
         vm.expectRevert(VaultMultisig.QuorumCannotBeZero.selector);
         new VaultMultisig(signersArray, 0);
+    }
+
+    function test_UpdateSignerAndQuorumWorks() public {
+        vm.startPrank(signer1);
+        console.log(newSignersArray.length);
+
+        address[] memory empty;
+
+        vm.expectRevert(VaultMultisig.SignersArrayCannotBeEmpty.selector);
+        vault.updateSignersAndQuorum(empty, 1);
+
+        vm.expectRevert(VaultMultisig.QuorumCannotBeZero.selector);
+        vault.updateSignersAndQuorum(newSignersArray, 0);
+
+        vm.expectRevert(VaultMultisig.QuorumGreaterThanSigners.selector);
+        vault.updateSignersAndQuorum(newSignersArray, 4);
+
+        vm.expectEmit(false, false, false, false);
+        emit VaultMultisig.MultiSigSignersUpdated();
+        vm.expectEmit(true, false, false, false);
+        emit VaultMultisig.QuorumUpdated(2);
+        vault.updateSignersAndQuorum(newSignersArray, 2);
+
     }
 
     function fundVault(uint256 amount) internal {

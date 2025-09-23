@@ -1,7 +1,7 @@
 /// SPDX-License-Identifier: MIT
 /// @title: Contract for wallet with multisig withdraw functionality.
 /// @notice: Allows to withdraw funds from the vault only if a certain number of signers approve the transaction.
-/// @author: Solidity University
+/// @author: yunoqii
 pragma solidity ^0.8.30;
 
 contract VaultMultisig {
@@ -73,9 +73,6 @@ contract VaultMultisig {
     /// @notice Checks that quorum was reached for transfer
     /// @param transferId The ID of the transfer
     error QuorumHasNotBeenReached(uint256 transferId);
-
-    /// @notice Checks that the signer is a multisig admin
-    error InvalidMultisigAdmin();
 
     /// @notice Emitted when a transfer is initiated
     event TransferInitiated(uint256 indexed transferId, address indexed to, uint256 amount);
