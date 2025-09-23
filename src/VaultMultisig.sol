@@ -1,7 +1,7 @@
 /// SPDX-License-Identifier: MIT
 /// @title: Contract for wallet with multisig withdraw functionality.
 /// @notice: Allows to withdraw funds from the vault only if a certain number of signers approve the transaction.
-/// @author: Solidity University
+/// @author: yunoqii
 pragma solidity ^0.8.30;
 
 contract VaultMultisig {
